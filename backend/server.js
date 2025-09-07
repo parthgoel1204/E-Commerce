@@ -7,23 +7,35 @@ const cors = require('cors');
 
 const app = express();
 
-const allowedOrigins = process.env.CORS_ORIGINS 
-  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:5173'];
-
+// Configure CORS
 const corsOptions = {
   origin: function (origin, callback) {
+    // In development, allow all origins for easier testing
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+
+    // In production, only allow specific origins
+    const allowedOrigins = process.env.CORS_ORIGINS 
+      ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+      : [];
+
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+    // Check if origin is allowed
+    if (allowedOrigins.includes(origin) || 
+        allowedOrigins.some(allowed => origin.endsWith(new URL(allowed).hostname))) {
+      return callback(null, true);
     }
-    return callback(null, true);
+
+    console.error('CORS blocked for origin:', origin);
+    console.error('Allowed origins:', allowedOrigins);
+    return callback(new Error('Not allowed by CORS'), false);
   },
   credentials: true,
-  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['set-cookie', 'authorization']
 };
 

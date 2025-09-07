@@ -77,9 +77,37 @@ app.use(cookieParser(process.env.JWT_SECRET, {
   maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
 }));
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB Connected'))
-  .catch(err => console.log(err));
+// MongoDB connection options
+const mongoOptions = {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 10s
+  socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+};
+
+// Connect to MongoDB
+const connectDB = async () => {
+  try {
+    console.log('Connecting to MongoDB...');
+    await mongoose.connect(process.env.MONGO_URI, mongoOptions);
+    console.log('MongoDB Connected');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    // Exit process with failure
+    process.exit(1);
+  }
+};
+
+// Handle MongoDB connection events
+mongoose.connection.on('error', err => {
+  console.error('MongoDB connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected');});
+
+// Connect to the database
+connectDB();
 
 // Import routes
 const authRoutes = require('./routes/auth');

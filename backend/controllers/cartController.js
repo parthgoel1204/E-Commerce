@@ -29,12 +29,10 @@ exports.addItemToCart = async (req, res) => {
     try {
       item = await Item.findById(itemId);
     } catch (error) {
-      // Invalid ObjectId format, treat as sample product
       item = null;
     }
     
     if (!item) {
-      // For sample products, create them in database if they don't exist
       const sampleProducts = {
         '1': { title: 'Wireless Headphones', description: 'Premium wireless headphones with noise cancellation', price: 99.99, category: 'electronics', image: 'https://images.unsplash.com/photo-1612858249937-1cc0852093dd?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D' },
         '2': { title: 'Smart Watch', description: 'Advanced fitness tracking and notifications', price: 299.99, category: 'electronics', image: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=627&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D' },
@@ -45,13 +43,11 @@ exports.addItemToCart = async (req, res) => {
       };
       
       if (sampleProducts[itemId]) {
-        // Create with a proper ObjectId
         item = new Item({
           ...sampleProducts[itemId]
         });
         await item.save();
         
-        // Update the itemId to the actual MongoDB _id for cart storage
         itemId = item._id.toString();
       } else {
         return res.status(404).json({ message: 'Item not found' });

@@ -1,8 +1,7 @@
 import axios from 'axios';
-
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
-  withCredentials: true, // This is important for sending cookies with requests
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -28,9 +27,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token might be expired, remove it
       localStorage.removeItem('token');
-      // Optionally redirect to login or refresh the page
     }
     return Promise.reject(error);
   }

@@ -7,65 +7,70 @@ const cors = require('cors');
 
 const app = express();
 
-// Configure CORS with enhanced logging
+// Debug environment
+console.log('Environment variables:', {
+  NODE_ENV: process.env.NODE_ENV,
+  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
+  MONGO_URI: !!process.env.MONGO_URI,
+});
+
+// Parse allowed origins from env (comma-separated)
+const raw = process.env.ALLOWED_ORIGINS || '';
+const allowedOrigins = raw.split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+console.log('Allowed origins:', allowedOrigins);
+
+// CORS options
 const corsOptions = {
   origin: function (origin, callback) {
-    console.log('Incoming origin:', origin);
-    
-    // Allow all origins in development
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('Allowing origin in development:', origin);
+    console.log('CORS incoming origin:', origin);
+
+    // Allow requests with no origin (e.g., server-to-server, mobile clients, curl)
+    if (!origin) return callback(null, true);
+
+    // If whitelist empty -> deny (safer), or allow only localhost for dev
+    if (allowedOrigins.length === 0) {
+      console.warn('CORS: empty whitelist, blocking origin:', origin);
+      return callback(new Error('Not allowed by CORS'), false);
+    }
+
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    // Get allowed origins from environment or use empty array
-    const allowedOrigins = process.env.CORS_ORIGINS 
-      ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
-      : [];
-
-    console.log('Allowed origins from env:', allowedOrigins);
-
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      console.log('No origin header, allowing request');
-      return callback(null, true);
-    }
-    
-    // Check if origin is in allowed list or is a subdomain of an allowed origin
-    const isAllowed = allowedOrigins.some(allowed => {
-      try {
-        const allowedUrl = new URL(allowed);
-        const originUrl = new URL(origin);
-        const isMatch = originUrl.hostname === allowedUrl.hostname || 
-                       originUrl.hostname.endsWith('.' + allowedUrl.hostname);
-        console.log(`Checking ${origin} against ${allowed}:`, isMatch);
-        return isMatch;
-      } catch (e) {
-        console.error('Error checking origin:', e);
-        return false;
-      }
-    });
-
-    if (isAllowed) {
-      console.log('Origin allowed:', origin);
+    // Allow any netlify app subdomain
+    if (origin.endsWith('.netlify.app')) {
       return callback(null, true);
     }
 
-    console.error('CORS blocked for origin:', origin);
-    console.error('Allowed origins:', allowedOrigins);
+    console.warn('CORS blocked for origin:', origin);
     return callback(new Error('Not allowed by CORS'), false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Content-Length', 'X-Requested-With'],
-  exposedHeaders: ['set-cookie', 'authorization'],
-  maxAge: 86400 // 24 hours
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['set-cookie', 'authorization']
 };
 
+// Apply CORS with the configured options
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+// Request logging for debugging
+app.use((req, res, next) => {
+  console.log('Incoming request:', {
+    method: req.method,
+    url: req.url,
+    origin: req.headers.origin,
+    cookie: req.headers.cookie ? true : false
+  });
+  next();
+});
 app.use(express.json());
 // Parse cookies with secure settings
-app.use(cookieParser(process.env.SESSION_SECRET, {
+app.use(cookieParser(process.env.JWT_SECRET, {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',

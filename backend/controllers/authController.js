@@ -19,9 +19,16 @@ exports.register = async (req, res) => {
     // Generate JWT token
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     
-    // Return the same format as login
+    // Set HTTP-only cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+    
+    // Return user data
     res.status(201).json({ 
-      token,
       user: {
         id: user._id,
         name: user.name,
@@ -42,9 +49,17 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    res.cookie('jwt', token, { httpOnly: true });
+    
+    // Set HTTP-only cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+    
+    // Return user data (without token in response body)
     res.json({ 
-      token,
       user: {
         id: user._id,
         name: user.name,
@@ -58,14 +73,38 @@ exports.login = async (req, res) => {
 };
 
 exports.logout = (req, res) => {
-  res.clearCookie('jwt');
-  res.json({ msg: 'Logged out' });
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+  });
+  res.json({ message: 'Logged out successfully' });
 };
 
 exports.getCurrentUser = async (req, res) => {
   try {
-    res.json(req.user);
+    // Get token from cookie
+    const token = req.cookies.token;
+    if (!token) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      id: user._id,
+      name: user.name,
+      email: user.email
+    });
   } catch (error) {
+    console.error('Get current user error:', error);
+    res.status(401).json({ message: 'Invalid or expired token' });
     res.status(500).json({ message: 'Server error' });
   }
 };

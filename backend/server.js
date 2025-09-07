@@ -7,15 +7,35 @@ const cors = require('cors');
 
 const app = express();
 
+const allowedOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+  : ['http://localhost:5173'];
+
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173', 
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
   optionsSuccessStatus: 200,
-  credentials: true
+  exposedHeaders: ['set-cookie', 'authorization']
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
-app.use(cookieParser());
+// Parse cookies with secure settings
+app.use(cookieParser(process.env.SESSION_SECRET, {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+}));
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB Connected'))

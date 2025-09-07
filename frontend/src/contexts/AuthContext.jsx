@@ -12,8 +12,9 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       setError(null);
-      const response = await api.post('/auth/login', { email, password });
-      localStorage.setItem('token', response.data.token);
+      const response = await api.post('/auth/login', { email, password }, {
+        withCredentials: true // Important for sending/receiving cookies
+      });
       setUser(response.data.user);
       return { success: true };
     } catch (error) {
@@ -25,8 +26,9 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, email, password) => {
     try {
       setError(null);
-      const response = await api.post('/auth/register', { name, email, password });
-      localStorage.setItem('token', response.data.token);
+      const response = await api.post('/auth/register', { name, email, password }, {
+        withCredentials: true // Important for sending/receiving cookies
+      });
       setUser(response.data.user);
       return { success: true };
     } catch (error) {
@@ -37,27 +39,26 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await api.post('/auth/logout');
-      localStorage.removeItem('token');
+      await api.post('/auth/logout', {}, {
+        withCredentials: true // Important for sending/receiving cookies
+      });
       setUser(null);
     } catch (error) {
       console.error('Logout error:', error);
+      // Still set user to null even if logout API fails
+      setUser(null);
     }
   };
 
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
       try {
-        const response = await api.get('/auth/me');
+        const response = await api.get('/auth/me', {
+          withCredentials: true // Important for sending cookies
+        });
         setUser(response.data);
       } catch (error) {
-        localStorage.removeItem('token');
+        console.error('Auth check failed:', error);
         setUser(null);
       } finally {
         setLoading(false);

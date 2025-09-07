@@ -7,25 +7,47 @@ const cors = require('cors');
 
 const app = express();
 
-// Configure CORS
+// Configure CORS with enhanced logging
 const corsOptions = {
   origin: function (origin, callback) {
-    // In development, allow all origins for easier testing
+    console.log('Incoming origin:', origin);
+    
+    // Allow all origins in development
     if (process.env.NODE_ENV !== 'production') {
+      console.log('Allowing origin in development:', origin);
       return callback(null, true);
     }
 
-    // In production, only allow specific origins
+    // Get allowed origins from environment or use empty array
     const allowedOrigins = process.env.CORS_ORIGINS 
       ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
       : [];
 
+    console.log('Allowed origins from env:', allowedOrigins);
+
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('No origin header, allowing request');
+      return callback(null, true);
+    }
     
-    // Check if origin is allowed
-    if (allowedOrigins.includes(origin) || 
-        allowedOrigins.some(allowed => origin.endsWith(new URL(allowed).hostname))) {
+    // Check if origin is in allowed list or is a subdomain of an allowed origin
+    const isAllowed = allowedOrigins.some(allowed => {
+      try {
+        const allowedUrl = new URL(allowed);
+        const originUrl = new URL(origin);
+        const isMatch = originUrl.hostname === allowedUrl.hostname || 
+                       originUrl.hostname.endsWith('.' + allowedUrl.hostname);
+        console.log(`Checking ${origin} against ${allowed}:`, isMatch);
+        return isMatch;
+      } catch (e) {
+        console.error('Error checking origin:', e);
+        return false;
+      }
+    });
+
+    if (isAllowed) {
+      console.log('Origin allowed:', origin);
       return callback(null, true);
     }
 
@@ -35,8 +57,9 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['set-cookie', 'authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Content-Length', 'X-Requested-With'],
+  exposedHeaders: ['set-cookie', 'authorization'],
+  maxAge: 86400 // 24 hours
 };
 
 app.use(cors(corsOptions));
